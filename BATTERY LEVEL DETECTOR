@@ -1,0 +1,58 @@
+#include <avr/io.h>
+#include <util/delay.h>
+#include <stdio.h>
+
+#define F_CPU 16000000UL // Assuming a 16 MHz clock frequency
+#define ADC_REF_VOLTAGE 5.0 // Reference voltage for the ADC
+
+void initADC() {
+    // Set ADC reference voltage to AVcc
+    ADMUX |= (1 << REFS0);
+    
+    // Enable ADC and set prescaler to 128 for optimal resolution
+    ADCSRA |= (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
+}
+
+uint16_t readADC(uint8_t channel) {
+    // Select ADC channel
+    ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
+    
+    // Start single conversion
+    ADCSRA |= (1 << ADSC);
+    
+    // Wait for conversion to complete
+    while (ADCSRA & (1 << ADSC));
+    
+    // Return ADC result
+    return ADC;
+}
+
+int main(void) {
+    // Initialize ADC
+    initADC();
+    
+    // Set up UART for serial communication
+    // (Assuming 9600 baud rate, 8 data bits, no parity, 1 stop bit)
+    UBRR0H = 0;
+    UBRR0L = 103;
+    UCSR0B = (1 << TXEN0);
+
+    while (1) {
+        // Read battery voltage from ADC channel 0
+        uint16_t sensorValue = readADC(0);
+        
+        // Convert ADC value to voltage
+        float voltage = (sensorValue / 1023.0) * ADC_REF_VOLTAGE;
+
+        // Calculate battery percentage based on voltage levels
+        int batteryPercentage = (int)((voltage - 3.0) / (4.2 - 3.0) * 100);
+
+        // Transmit battery voltage and percentage over UART
+        printf("Battery Voltage: %.2f V\n", voltage);
+        printf("Battery Percentage: %d%%\n", batteryPercentage);
+
+        _delay_ms(1000); // Delay for stability
+    }
+
+    return 0;
+}
